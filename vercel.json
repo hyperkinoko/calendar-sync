@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "api/webhook/calendar.ts": {
+      "maxDuration": 10
+    },
+    "api/cron/refresh-webhooks.ts": {
+      "maxDuration": 10
+    },
+    "api/setup/initialize.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/refresh-webhooks",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+# Docker Compose V2形式
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      # ローカルRedisを使用
+      KV_URL: redis://redis:6379
+    env_file:
+      - .env.local
+    command: npm run dev
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: calendar_sync_network
