@@ -8,7 +8,9 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "sync:manual": "tsx scripts/manual-sync.ts",
-    "setup:webhooks": "tsx scripts/setup-webhooks.ts"
+    "setup:webhooks": "tsx scripts/setup-webhooks.ts",
+    "webhooks:list": "tsx scripts/setup-webhooks.ts list",
+    "webhooks:refresh": "tsx scripts/setup-webhooks.ts refresh"
   },
   "keywords": [
     "google-calendar",
