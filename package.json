@@ -4,7 +4,7 @@
   "description": "Google Calendarの予定を自動同期するシステム",
   "main": "index.js",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "echo 'Docker環境では手動同期をテストしてください: npm run sync:manual'",
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "sync:manual": "tsx scripts/manual-sync.ts",

@@ -8,7 +8,7 @@ import type { ApiResponse } from '@/types';
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
-): Promise<void> {
+) {
   // メソッドチェック
   if (req.method !== 'POST') {
     return res.status(405).json({

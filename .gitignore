@@ -7,6 +7,12 @@ node_modules/
 .env.local
 .env.production
 
+# Google Service Account キー
+*.json
+service-account*.json
+*-service-account.json
+google-credentials.json
+
 # ビルド出力
 dist/
 .next/

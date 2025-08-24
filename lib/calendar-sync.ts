@@ -107,8 +107,8 @@ export async function getCalendarEvents(
     
     return {
       events,
-      nextSyncToken: response.data.nextSyncToken,
-      nextPageToken: response.data.nextPageToken,
+      nextSyncToken: response.data.nextSyncToken || undefined,
+      nextPageToken: response.data.nextPageToken || undefined,
     };
   } catch (error: any) {
     console.error(`❌ イベント取得エラー (${calendarId}):`, error.message);
