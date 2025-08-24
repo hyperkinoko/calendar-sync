@@ -21,7 +21,8 @@
   "license": "MIT",
   "dependencies": {
     "@vercel/kv": "^1.0.1",
-    "googleapis": "^118.0.0"
+    "googleapis": "^118.0.0",
+    "redis": "^4.6.12"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
