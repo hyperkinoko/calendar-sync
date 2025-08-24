@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📅 Calendar Sync System</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px; 
+            line-height: 1.6; 
+            color: #333;
+        }
+        .header { text-align: center; margin-bottom: 40px; }
+        .status { 
+            background: #f5f5f5; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+        }
+        .endpoint { 
+            background: #e8f4fd; 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin: 10px 0; 
+            font-family: monospace; 
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📅 Google Calendar 同期システム</h1>
+        <p>個人カレンダーの予定を「🔒 予定あり」として自動同期</p>
+    </div>
+
+    <div class="status">
+        <h2>🚀 システム状況</h2>
+        <p><strong>Status:</strong> 稼働中</p>
+        <p><strong>Version:</strong> v1.0.0</p>
+        <p><strong>Last Updated:</strong> 2025-08-24</p>
+    </div>
+
+    <div class="status">
+        <h2>🔗 API エンドポイント</h2>
+        
+        <h3>システム初期化</h3>
+        <div class="endpoint">
+            POST /api/setup/initialize
+            <br>Authorization: Bearer [CRON_SECRET]
+        </div>
+
+        <h3>Webhook受信</h3>
+        <div class="endpoint">
+            POST /api/webhook/calendar?token=[WEBHOOK_SECRET]
+        </div>
+
+        <h3>Webhook更新（Cron）</h3>
+        <div class="endpoint">
+            POST /api/cron/refresh-webhooks
+            <br>Authorization: Bearer [CRON_SECRET]
+            <br>スケジュール: 毎日午前2時
+        </div>
+    </div>
+
+    <div class="status">
+        <h2>📖 詳細情報</h2>
+        <ul>
+            <li>リアルタイム同期対応</li>
+            <li>プライバシー保護（詳細は隠蔽）</li>
+            <li>自動Webhook更新</li>
+            <li>エラーハンドリング・リトライ機能</li>
+        </ul>
+    </div>
+</body>
+</html>
