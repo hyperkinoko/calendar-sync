@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { loadEnvConfig } from '../../lib/google-auth';
 import { getSourceCalendars } from '../../lib/calendar-sync';
-import { debouncedSync, getTimerStatus } from '../../lib/debounce-timer';
 import type { ApiResponse } from '../../types';
 
 // Googleから送信されるWebhookヘッダー
@@ -49,15 +48,13 @@ async function handleStatusCheck(req: VercelRequest, res: VercelResponse) {
       } as ApiResponse);
     }
     
-    const timerStatus = getTimerStatus();
-    
     return res.status(200).json({
       success: true,
-      message: 'Webhook endpoint active',
+      message: 'Webhook endpoint active - 即座同期モード',
       data: {
         timestamp: new Date().toISOString(),
-        activeTimers: timerStatus.length,
-        timers: timerStatus
+        syncMode: 'immediate',
+        debounceMode: 'disabled (Vercel Functions制約のため)'
       }
     } as ApiResponse);
     
@@ -166,24 +163,36 @@ async function handleWebhook(
       } as ApiResponse);
     }
 
-    // デバウンス同期を実行（即座には同期せず、5分後にタイマーで実行）
-    console.log(`📅 カレンダー変更検知: ${targetCalendar.name} (${calendarId})`);
-    debouncedSync(calendarId, `webhook-${resourceState}`);
+    // Vercel Functionsでは長時間タイマーが保持されないため、即座に同期実行
+    console.log(`📅 カレンダー変更検知: ${targetCalendar.name} (${calendarId}) - 即座に同期実行`);
+    
+    // 同期処理を実行
+    const { syncSingleCalendar } = await import('../../lib/calendar-sync');
+    const syncResult = await syncSingleCalendar(targetCalendar);
 
     const processingTime = Date.now() - startTime;
 
-    console.log(`✅ Webhook処理完了 - デバウンスタイマー設定 (${processingTime}ms)`);
+    console.log(`✅ Webhook処理完了 - 同期実行 (${processingTime}ms):`);
+    console.log(`   - 作成: ${syncResult.created}件`);
+    console.log(`   - 更新: ${syncResult.updated}件`);
+    console.log(`   - 削除: ${syncResult.deleted}件`);
+    console.log(`   - エラー: ${syncResult.errors.length}件`);
 
-    // 成功レスポンス（同期は後でタイマーにより実行される）
+    // 成功レスポンス
     return res.status(200).json({
       success: true,
-      message: 'Webhook受信完了 - デバウンス同期をスケジュール',
+      message: 'Webhook受信完了 - 同期実行完了',
       data: {
         calendar: targetCalendar.name,
         calendarId: calendarId,
         resourceState: resourceState,
-        debounceDelay: '5分',
-        processingTime: `${processingTime}ms`
+        processingTime: `${processingTime}ms`,
+        syncResult: {
+          created: syncResult.created,
+          updated: syncResult.updated,
+          deleted: syncResult.deleted,
+          errors: syncResult.errors.length
+        }
       },
     } as ApiResponse);
 
