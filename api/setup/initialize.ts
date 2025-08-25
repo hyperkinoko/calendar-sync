@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadEnvConfig, verifyAllCalendarAccess } from '@/lib/google-auth';
-import { registerAllWebhooks, listAllWebhooks } from '@/lib/webhook-manager';
-import { syncAllCalendars } from '@/lib/calendar-sync';
-import { withRetry, logError, measureTime } from '@/lib/error-handler';
-import type { ApiResponse } from '@/types';
+import { loadEnvConfig, verifyAllCalendarAccess } from '../../lib/google-auth';
+import { registerAllWebhooks, listAllWebhooks } from '../../lib/webhook-manager';
+import { syncAllCalendars } from '../../lib/calendar-sync';
+import { withRetry, logError, measureTime } from '../../lib/error-handler';
+import type { ApiResponse } from '../../types';
 
 export default async function handler(
   req: VercelRequest,

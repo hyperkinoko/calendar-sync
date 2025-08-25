@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadEnvConfig } from '@/lib/google-auth';
-import { syncAllCalendars } from '@/lib/calendar-sync';
-import type { ApiResponse } from '@/types';
+import { loadEnvConfig } from '../../lib/google-auth';
+import { syncAllCalendars } from '../../lib/calendar-sync';
+import type { ApiResponse } from '../../types';
 
 /**
  * 週1回の定時同期Cronエンドポイント

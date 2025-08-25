@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import type { EnvConfig } from '@/types';
+import type { EnvConfig } from '../types';
 
 // 環境変数の検証とロード
 export function loadEnvConfig(): EnvConfig {

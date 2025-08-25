@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadEnvConfig } from '@/lib/google-auth';
-import { refreshExpiredWebhooks, listAllWebhooks } from '@/lib/webhook-manager';
-import { withRetry, logError, measureTime } from '@/lib/error-handler';
-import type { ApiResponse } from '@/types';
+import { loadEnvConfig } from '../../lib/google-auth';
+import { refreshExpiredWebhooks, listAllWebhooks } from '../../lib/webhook-manager';
+import { withRetry, logError, measureTime } from '../../lib/error-handler';
+import type { ApiResponse } from '../../types';
 
 export default async function handler(
   req: VercelRequest,

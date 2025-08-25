@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadEnvConfig } from '@/lib/google-auth';
-import { getSourceCalendars } from '@/lib/calendar-sync';
-import { debouncedSync, getTimerStatus } from '@/lib/debounce-timer';
-import type { ApiResponse } from '@/types';
+import { loadEnvConfig } from '../../lib/google-auth';
+import { getSourceCalendars } from '../../lib/calendar-sync';
+import { debouncedSync, getTimerStatus } from '../../lib/debounce-timer';
+import type { ApiResponse } from '../../types';
 
 // Googleから送信されるWebhookヘッダー
 interface GoogleWebhookHeaders {

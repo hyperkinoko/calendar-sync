@@ -1,6 +1,6 @@
 import { getCalendarClient, loadEnvConfig } from './google-auth';
 import { getSourceCalendars } from './calendar-sync';
-import type { WebhookChannel } from '@/types';
+import type { WebhookChannel } from '../types';
 import { randomUUID } from 'crypto';
 
 // Webhook情報をメモリで管理（ステートレス処理）

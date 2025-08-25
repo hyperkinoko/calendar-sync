@@ -1,5 +1,5 @@
 import { getCalendarClient, loadEnvConfig } from './google-auth';
-import type { CalendarEvent, SyncResult, SyncMetadata } from '@/types';
+import type { CalendarEvent, SyncResult, SyncMetadata } from '../types';
 
 // カレンダーの設定情報
 export interface SourceCalendarConfig {
