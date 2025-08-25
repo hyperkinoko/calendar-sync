@@ -6,14 +6,17 @@
     "api/cron/refresh-webhooks.ts": {
       "maxDuration": 10
     },
+    "api/cron/weekly-sync.ts": {
+      "maxDuration": 60
+    },
     "api/setup/initialize.ts": {
       "maxDuration": 30
     }
   },
   "crons": [
     {
-      "path": "/api/cron/refresh-webhooks",
-      "schedule": "0 2 * * *"
+      "path": "/api/cron/weekly-sync",
+      "schedule": "0 3 * * 0"
     }
   ]
 }

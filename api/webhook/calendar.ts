@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { loadEnvConfig } from '@/lib/google-auth';
-import { syncSingleCalendar, getSourceCalendars } from '@/lib/calendar-sync';
-import { withRetry, logError, measureTime } from '@/lib/error-handler';
+import { getSourceCalendars } from '@/lib/calendar-sync';
+import { debouncedSync, getTimerStatus } from '@/lib/debounce-timer';
 import type { ApiResponse } from '@/types';
 
 // Googleから送信されるWebhookヘッダー
@@ -19,13 +19,64 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // メソッドチェック
-  if (req.method !== 'POST') {
-    return res.status(405).json({
+  // GET: ステータス確認用エンドポイント
+  if (req.method === 'GET') {
+    return handleStatusCheck(req, res);
+  }
+  
+  // POST: Webhook受信処理
+  if (req.method === 'POST') {
+    return handleWebhook(req, res);
+  }
+  
+  return res.status(405).json({
+    success: false,
+    error: 'GET または POST メソッドのみ許可されています',
+  } as ApiResponse);
+}
+
+/**
+ * ステータス確認処理
+ */
+async function handleStatusCheck(req: VercelRequest, res: VercelResponse) {
+  try {
+    // 簡易認証チェック
+    const config = loadEnvConfig();
+    if (req.query.token !== config.WEBHOOK_SECRET) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized'
+      } as ApiResponse);
+    }
+    
+    const timerStatus = getTimerStatus();
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook endpoint active',
+      data: {
+        timestamp: new Date().toISOString(),
+        activeTimers: timerStatus.length,
+        timers: timerStatus
+      }
+    } as ApiResponse);
+    
+  } catch (error: any) {
+    return res.status(500).json({
       success: false,
-      error: 'POST メソッドのみ許可されています',
+      error: 'Internal server error',
+      message: error.message
     } as ApiResponse);
   }
+}
+
+/**
+ * Webhook受信処理（デバウンス機能付き）
+ */
+async function handleWebhook(
+  req: VercelRequest,
+  res: VercelResponse
+) {
 
   const startTime = Date.now();
   
@@ -115,50 +166,30 @@ export default async function handler(
       } as ApiResponse);
     }
 
-    // 同期処理を実行（リトライ付き）
-    const { result: syncResult, duration } = await measureTime(
-      `${targetCalendar.name}の同期`,
-      () => withRetry(
-        () => syncSingleCalendar(targetCalendar),
-        {
-          maxAttempts: 3,
-          baseDelay: 2000,
-          maxDelay: 30000,
-        }
-      )
-    );
+    // デバウンス同期を実行（即座には同期せず、5分後にタイマーで実行）
+    console.log(`📅 カレンダー変更検知: ${targetCalendar.name} (${calendarId})`);
+    debouncedSync(calendarId, `webhook-${resourceState}`);
 
     const processingTime = Date.now() - startTime;
 
-    console.log(`✅ Webhook処理完了 (${processingTime}ms):`);
-    console.log(`   - 作成: ${syncResult.created}件`);
-    console.log(`   - 更新: ${syncResult.updated}件`);
-    console.log(`   - 削除: ${syncResult.deleted}件`);
-    console.log(`   - エラー: ${syncResult.errors.length}件`);
+    console.log(`✅ Webhook処理完了 - デバウンスタイマー設定 (${processingTime}ms)`);
 
-    // 成功レスポンス
+    // 成功レスポンス（同期は後でタイマーにより実行される）
     return res.status(200).json({
       success: true,
-      message: '同期完了',
+      message: 'Webhook受信完了 - デバウンス同期をスケジュール',
       data: {
         calendar: targetCalendar.name,
-        duration,
-        created: syncResult.created,
-        updated: syncResult.updated,
-        deleted: syncResult.deleted,
-        errors: syncResult.errors.length,
+        calendarId: calendarId,
+        resourceState: resourceState,
+        debounceDelay: '5分',
+        processingTime: `${processingTime}ms`
       },
     } as ApiResponse);
 
   } catch (error: any) {
     const processingTime = Date.now() - startTime;
     
-    logError('Webhook処理', error, {
-      headers: req.headers,
-      query: req.query,
-      processingTime,
-    });
-
     console.error(`❌ Webhook処理エラー (${processingTime}ms):`, error.message);
 
     return res.status(500).json({

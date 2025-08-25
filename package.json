@@ -8,7 +8,8 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "sync:manual": "tsx scripts/manual-sync.ts",
-    "oauth2:setup": "tsx scripts/oauth2-setup.ts"
+    "oauth2:setup": "tsx scripts/oauth2-setup.ts",
+    "webhook:setup": "tsx scripts/setup-webhooks.ts"
   },
   "keywords": [
     "google-calendar",
