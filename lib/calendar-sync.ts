@@ -1,12 +1,4 @@
 import { getCalendarClient, loadEnvConfig } from './google-auth';
-import {
-  getSyncToken,
-  setSyncToken,
-  getEventMapping,
-  setEventMapping,
-  deleteEventMapping,
-  setLastSync,
-} from './storage';
 import type { CalendarEvent, SyncResult, SyncMetadata } from '@/types';
 
 // カレンダーの設定情報
@@ -67,10 +59,10 @@ export async function getCalendarEvents(
     if (syncToken) {
       params.syncToken = syncToken;
     } else {
-      // 初回同期は直近30日〜未来60日の範囲で取得
+      // 初回同期は1週間前〜未来90日の範囲で取得
       const now = new Date();
-      const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const timeMax = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+      const timeMin = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
       
       params.timeMin = timeMin.toISOString();
       params.timeMax = timeMax.toISOString();
@@ -81,7 +73,21 @@ export async function getCalendarEvents(
     const events = (response.data.items || [])
       .filter((event: any) => {
         // 全日イベント、または時間が指定されているイベントのみ
-        return event.start && (event.start.dateTime || event.start.date);
+        if (!event.start || (!event.start.dateTime && !event.start.date)) {
+          return false;
+        }
+        
+        // 辞退したイベントは除外
+        // attendeesの中で自分のresponseStatusがdeclinedの場合は除外
+        if (event.attendees && Array.isArray(event.attendees)) {
+          const selfAttendee = event.attendees.find((attendee: any) => attendee.self === true);
+          if (selfAttendee && selfAttendee.responseStatus === 'declined') {
+            console.log(`⏭️ 辞退したイベントをスキップ: ${event.summary}`);
+            return false;
+          }
+        }
+        
+        return true;
       })
       .map((event: any): CalendarEvent => ({
         id: event.id,
@@ -163,7 +169,96 @@ export function createSyncEvent(
       useDefault: false,
       overrides: [], // リマインダーなし
     },
+    extendedProperties: {
+      private: {
+        sourceCalendarId: metadata.sourceCalendarId,
+        sourceCalendarName: metadata.sourceCalendarName,
+        sourceEventId: metadata.sourceEventId,
+        syncedAt: metadata.syncedAt,
+      },
+    },
   };
+}
+
+// 同じ時間帯に既存のイベントがあるかチェック
+async function checkForDuplicateEvent(
+  event: CalendarEvent,
+  targetCalendarId: string
+): Promise<boolean> {
+  const calendar = getCalendarClient();
+  
+  try {
+    // イベントの開始・終了時間を取得
+    const timeMin = event.start.dateTime || event.start.date;
+    const timeMax = event.end.dateTime || event.end.date;
+    
+    if (!timeMin || !timeMax) {
+      return false;
+    }
+    
+    // 同じ時間帯のイベントを検索
+    // 全日イベントの場合は日付形式で検索
+    const searchParams: any = {
+      calendarId: targetCalendarId,
+      singleEvents: true,
+      maxResults: 100,
+    };
+    
+    // dateTimeがある場合（時刻指定イベント）
+    if (event.start.dateTime) {
+      searchParams.timeMin = timeMin;
+      searchParams.timeMax = timeMax;
+    } else {
+      // 全日イベントの場合
+      searchParams.timeMin = timeMin + 'T00:00:00Z';
+      searchParams.timeMax = timeMax + 'T23:59:59Z';
+    }
+    
+    const response = await calendar.events.list(searchParams);
+    
+    const existingEvents = response.data.items || [];
+    
+    // 同じ時間帯に同期イベントがあるかチェック
+    for (const existingEvent of existingEvents) {
+      // extendedPropertiesにsourceCalendarIdがある場合は同期で作成されたイベント
+      if (existingEvent.extendedProperties?.private?.sourceCalendarId) {
+        // 時間が重複しているかチェック
+        const existingStart = existingEvent.start?.dateTime || existingEvent.start?.date;
+        const existingEnd = existingEvent.end?.dateTime || existingEvent.end?.date;
+        
+        // 包含関係をチェック：既存イベントが新しいイベントを包含している場合
+        // 既存の開始時刻 <= 新しい開始時刻 && 既存の終了時刻 >= 新しい終了時刻
+        
+        // 時刻指定イベントの場合
+        if (event.start.dateTime && existingEvent.start?.dateTime) {
+          const newStart = new Date(timeMin).getTime();
+          const newEnd = new Date(timeMax).getTime();
+          const existStart = new Date(existingStart!).getTime();
+          const existEnd = new Date(existingEnd!).getTime();
+          
+          // 既存イベントが新しいイベントを包含している場合
+          if (existStart <= newStart && existEnd >= newEnd) {
+            const sourceCalendar = existingEvent.extendedProperties?.private?.sourceCalendarName || '不明';
+            console.log(`⏭️ 重複イベントをスキップ: 既存の同期イベントに包含される（ソース: ${sourceCalendar}）`);
+            return true;
+          }
+        } 
+        // 全日イベントの場合は完全一致のみチェック
+        else if (event.start.date && existingEvent.start?.date) {
+          if (existingStart === timeMin && existingEnd === timeMax) {
+            const sourceCalendar = existingEvent.extendedProperties?.private?.sourceCalendarName || '不明';
+            console.log(`⏭️ 重複イベントをスキップ: 同じ日の同期済みイベント（ソース: ${sourceCalendar}）`);
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  } catch (error: any) {
+    console.error(`⚠️ 重複チェックエラー:`, error.message);
+    return false; // エラーの場合は重複なしとして処理を続行
+  }
 }
 
 // イベントを同期先カレンダーに作成
@@ -174,6 +269,13 @@ export async function createEventInTarget(
   const calendar = getCalendarClient();
   
   try {
+    // 重複チェック
+    const isDuplicate = await checkForDuplicateEvent(event, targetCalendarId);
+    if (isDuplicate) {
+      // 重複している場合は仮のIDを返す（マッピング保存用）
+      return `duplicate_${Date.now()}`;
+    }
+    
     console.log(`📝 イベント作成: ${event.summary} (${event.start.dateTime || event.start.date})`);
     
     const response = await calendar.events.insert({
@@ -256,13 +358,12 @@ export async function syncSingleCalendar(
   try {
     console.log(`\n🔄 同期開始: ${sourceCalendarConfig.name} → プロジェクトA`);
     
-    // 同期トークンを取得
-    const syncToken = await getSyncToken(sourceCalendarConfig.id);
+    // 同期トークンは使用しない（ステートレス処理）
     
-    // カレンダーイベントを取得
+    // 同期範囲（1週間前〜90日後）で毎回全件取得
     const { events, nextSyncToken } = await getCalendarEvents(
       sourceCalendarConfig.id,
-      syncToken
+      null // syncTokenを使わずに毎回全件取得
     );
 
     // 各イベントを処理
@@ -270,13 +371,6 @@ export async function syncSingleCalendar(
       try {
         // イベントが削除されているかチェック
         if (event.summary === 'cancelled') {
-          // 削除されたイベントの処理
-          const mappedEventId = await getEventMapping(sourceCalendarConfig.id, event.id!);
-          if (mappedEventId) {
-            await deleteEventFromTarget(mappedEventId, targetCalendarId);
-            await deleteEventMapping(sourceCalendarConfig.id, event.id!);
-            syncResult.deleted++;
-          }
           continue;
         }
 
@@ -291,17 +385,10 @@ export async function syncSingleCalendar(
         // 同期用イベントを作成
         const syncEvent = createSyncEvent(event, metadata);
 
-        // 既存のマッピングを確認
-        const existingMappedId = await getEventMapping(sourceCalendarConfig.id, event.id!);
-        
-        if (existingMappedId) {
-          // 既存イベントを更新
-          await updateEventInTarget(existingMappedId, syncEvent, targetCalendarId);
-          syncResult.updated++;
-        } else {
-          // 新規イベントを作成
-          const newEventId = await createEventInTarget(syncEvent, targetCalendarId);
-          await setEventMapping(sourceCalendarConfig.id, event.id!, newEventId);
+        // 新規イベントを作成（重複チェックは内部で実施）
+        const newEventId = await createEventInTarget(syncEvent, targetCalendarId);
+        // 重複でスキップされた場合はカウントしない
+        if (!newEventId.startsWith('duplicate_')) {
           syncResult.created++;
         }
       } catch (error: any) {
@@ -313,13 +400,7 @@ export async function syncSingleCalendar(
       }
     }
 
-    // 同期トークンを保存
-    if (nextSyncToken) {
-      await setSyncToken(sourceCalendarConfig.id, nextSyncToken);
-    }
-
-    // 最終同期時刻を更新
-    await setLastSync(sourceCalendarConfig.id);
+    // 同期完了（ステートレス処理のため保存処理なし）
 
     console.log(`✅ 同期完了: ${sourceCalendarConfig.name}`);
     console.log(`   - 作成: ${syncResult.created}件`);
@@ -337,6 +418,57 @@ export async function syncSingleCalendar(
   return syncResult;
 }
 
+// 同期先カレンダーから古い「🔒 予定あり」イベントを削除
+async function cleanupOldSyncEvents(targetCalendarId: string): Promise<number> {
+  const calendar = getCalendarClient();
+  let deletedCount = 0;
+  
+  try {
+    console.log(`🧹 同期先カレンダーの古いイベントをクリーンアップ中...`);
+    
+    // 同期範囲と同じ期間のイベントを取得
+    const now = new Date();
+    const timeMin = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    
+    const response = await calendar.events.list({
+      calendarId: targetCalendarId,
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      singleEvents: true,
+      maxResults: 2500,
+    });
+    
+    const events = response.data.items || [];
+    
+    // 同期で作成されたイベントを削除（extendedPropertiesで判定）
+    for (const event of events) {
+      if (event.extendedProperties?.private?.sourceCalendarId) {
+        try {
+          await calendar.events.delete({
+            calendarId: targetCalendarId,
+            eventId: event.id!,
+          });
+          deletedCount++;
+        } catch (error: any) {
+          if (error.code !== 404) {
+            console.error(`削除エラー: ${event.id}`, error.message);
+          }
+        }
+      }
+    }
+    
+    if (deletedCount > 0) {
+      console.log(`✅ ${deletedCount}件の古いイベントを削除しました`);
+    }
+    
+  } catch (error: any) {
+    console.error(`❌ クリーンアップエラー:`, error.message);
+  }
+  
+  return deletedCount;
+}
+
 // すべてのソースカレンダーを同期
 export async function syncAllCalendars(): Promise<{
   success: boolean;
@@ -347,6 +479,7 @@ export async function syncAllCalendars(): Promise<{
   totalErrors: number;
 }> {
   const sourceCalendars = getSourceCalendars();
+  const targetCalendarId = getTargetCalendarId();
   const results: Record<string, SyncResult> = {};
   
   let totalCreated = 0;
@@ -355,6 +488,9 @@ export async function syncAllCalendars(): Promise<{
   let totalErrors = 0;
 
   console.log(`\n🚀 全カレンダー同期開始 (${sourceCalendars.length}個)`);
+  
+  // クリーンアップは行わず、重複チェックのみで処理
+  // const cleanedCount = await cleanupOldSyncEvents(targetCalendarId);
   
   for (const calendar of sourceCalendars) {
     const result = await syncSingleCalendar(calendar);

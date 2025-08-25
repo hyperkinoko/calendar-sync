@@ -1,12 +1,10 @@
 import { getCalendarClient, loadEnvConfig } from './google-auth';
-import {
-  getWebhookChannel,
-  setWebhookChannel,
-  deleteWebhookChannel,
-} from './storage';
 import { getSourceCalendars } from './calendar-sync';
 import type { WebhookChannel } from '@/types';
 import { randomUUID } from 'crypto';
+
+// Webhook情報をメモリで管理（ステートレス処理）
+const webhookChannels = new Map<string, WebhookChannel>();
 
 // WebhookのURLを生成
 export function getWebhookUrl(): string {
@@ -58,8 +56,8 @@ export async function registerWebhook(calendarId: string): Promise<WebhookChanne
       address: webhookUrl,
     };
 
-    // ストレージに保存
-    await setWebhookChannel(calendarId, channel);
+    // メモリに保存
+    webhookChannels.set(calendarId, channel);
     
     const expirationDate = new Date(channel.expiration).toLocaleString('ja-JP', {
       timeZone: 'Asia/Tokyo',
@@ -90,7 +88,7 @@ export async function stopWebhook(calendarId: string): Promise<boolean> {
   const calendar = getCalendarClient();
   
   try {
-    const channel = await getWebhookChannel(calendarId);
+    const channel = webhookChannels.get(calendarId);
     if (!channel) {
       console.log(`⚠️ Webhookチャンネルが見つかりません: ${calendarId}`);
       return true;
@@ -106,7 +104,7 @@ export async function stopWebhook(calendarId: string): Promise<boolean> {
     });
 
     // ストレージから削除
-    await deleteWebhookChannel(calendarId);
+    webhookChannels.delete(calendarId);
     
     console.log(`✅ Webhook停止完了: ${channel.id}`);
     return true;
@@ -116,7 +114,7 @@ export async function stopWebhook(calendarId: string): Promise<boolean> {
     if (error.code === 404) {
       console.log(`⚠️ Webhookは既に無効です: ${calendarId}`);
       // ストレージからも削除
-      await deleteWebhookChannel(calendarId);
+      webhookChannels.delete(calendarId);
       return true;
     }
     
@@ -126,7 +124,7 @@ export async function stopWebhook(calendarId: string): Promise<boolean> {
 
 // Webhookの有効期限をチェック
 export async function isWebhookExpired(calendarId: string): Promise<boolean> {
-  const channel = await getWebhookChannel(calendarId);
+  const channel = webhookChannels.get(calendarId);
   
   if (!channel) {
     return true; // チャンネルがない場合は期限切れとして扱う
@@ -240,7 +238,7 @@ export async function listAllWebhooks(): Promise<Record<string, WebhookChannel |
   console.log(`\n📋 Webhook一覧:`);
   
   for (const calendar of sourceCalendars) {
-    const channel = await getWebhookChannel(calendar.id);
+    const channel = webhookChannels.get(calendar.id) || null;
     webhooks[calendar.name] = channel;
     
     if (channel) {

@@ -8,9 +8,7 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "sync:manual": "tsx scripts/manual-sync.ts",
-    "setup:webhooks": "tsx scripts/setup-webhooks.ts",
-    "webhooks:list": "tsx scripts/setup-webhooks.ts list",
-    "webhooks:refresh": "tsx scripts/setup-webhooks.ts refresh"
+    "oauth2:setup": "tsx scripts/oauth2-setup.ts"
   },
   "keywords": [
     "google-calendar",
@@ -20,9 +18,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@vercel/kv": "^1.0.1",
-    "googleapis": "^118.0.0",
-    "redis": "^4.6.12"
+    "googleapis": "^118.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

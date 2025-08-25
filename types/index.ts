@@ -69,8 +69,9 @@ export const STORAGE_KEYS = {
 
 // 環境変数の型定義
 export interface EnvConfig {
-  GOOGLE_SERVICE_ACCOUNT_EMAIL: string;
-  GOOGLE_PRIVATE_KEY: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_REFRESH_TOKEN?: string;
   PROJECT_A_CALENDAR_ID: string;
   PRIVATE_CALENDAR_ID: string;
   WORK_CALENDAR_ID: string;
